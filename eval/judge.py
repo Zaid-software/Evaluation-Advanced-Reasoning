@@ -52,6 +52,8 @@ def _judge_offline(strategy: str, question: str, trace_summary: str) -> dict:
 
 
 def _parse_judge_output(raw_output: str, judge_model: str) -> dict:
+    if not raw_output:
+        return {"score": 0, "reason": "empty_judge_output", "judge_model": judge_model}
     m = re.search(r"SCORE:\s*([01])\s*\|\s*REASON:\s*(.+)", raw_output, re.IGNORECASE)
     if not m:
         return {"score": 0, "reason": f"unparseable_judge_output: {raw_output[:150]}", "judge_model": judge_model}
