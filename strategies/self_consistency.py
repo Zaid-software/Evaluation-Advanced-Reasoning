@@ -73,7 +73,6 @@ class SelfConsistencyStrategy(Strategy):
         answer, steps, error_template = get_worked_solution(problem_id, self.name, sample_index=sample_idx)
         n_tools = 0
         try:
-            # exercise the shared calculator tool for realism, even offline
             calculator(f"{answer} + 0")
             n_tools = 1
         except CalculatorError:
@@ -94,6 +93,11 @@ class SelfConsistencyStrategy(Strategy):
         tracer.log("llm_call", inputs={"sample_index": sample_idx, "question": question},
                    outputs={"raw_response": raw_response}, tokens_in=t_in, tokens_out=t_out,
                    latency_ms=latency, metadata={"model": llm.name, "temperature": 0.7})
+
+        if not raw_response:
+            tracer.log("llm_call", inputs={"sample_index": sample_idx},
+                       outputs={"error": "empty_response"}, metadata={"model": llm.name})
+            return None, t_in, t_out, 0
 
         answer = self._extract_final_answer(raw_response)
         n_tools = 0
