@@ -1,0 +1,11 @@
+{
+  "recorded_at": "2026-06-22",
+  "recorded_against": "offline deterministic stub LLM (see tools/reference_solver.py) -- NOT real model accuracy",
+  "golden_set_version": "24 hand-written GSM8K-style problems, eval/golden_set.jsonl",
+  "accuracy": {
+    "plan_and_execute": {"n_correct": 20, "n_total": 24, "accuracy": 0.8333},
+    "self_consistency": {"n_correct": 24, "n_total": 24, "accuracy": 1.0},
+    "tree_of_thoughts": {"n_correct": 17, "n_total": 24, "accuracy": 0.7083}
+  },
+  "note": "Re-run `make eval` after any strategy/prompt change and diff against this file. A real OPENROUTER_API_KEY run will produce different (and more meaningful) numbers -- re-baseline after switching to the real LLM path."
+}
