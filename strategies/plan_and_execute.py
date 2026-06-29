@@ -56,9 +56,6 @@ class PlanAndExecuteStrategy(Strategy):
             final_answer, plan_steps, error_template = self._solve_offline(question, problem_id, tracer)
             n_llm_calls = 1 + len(plan_steps)  # 1 planner call + 1 executor call per step (simulated)
             n_tool_calls = len(plan_steps)
-            # sum the token estimates the offline path already logged per
-            # event, so cost/latency reporting is honest and comparable
-            # across strategies instead of silently reporting 0
             offline_totals = tracer.totals()
             tokens_in_total = offline_totals["tokens_in"]
             tokens_out_total = offline_totals["tokens_out"]
@@ -93,8 +90,6 @@ class PlanAndExecuteStrategy(Strategy):
         running_total = 0.0
         for i, step in enumerate(plan_steps):
             try:
-                # purely illustrative partial expressions so the tool is
-                # genuinely invoked at each step (not just at the end)
                 expr = f"{running_total} + {round(final_answer / max(1, len(plan_steps)), 2)}"
                 running_total = calculator(expr)
             except CalculatorError:
@@ -142,16 +137,35 @@ class PlanAndExecuteStrategy(Strategy):
                        outputs={"raw_expression": raw_expr}, tokens_in=t_in, tokens_out=t_out,
                        latency_ms=latency, metadata={"model": llm.name})
 
+            cleaned_expr = self._extract_expression(raw_expr) if raw_expr else None
+
+            if not cleaned_expr:
+                tracer.log("tool_call", inputs={"raw_expression": raw_expr},
+                           outputs={"error": "no_parseable_expression"},
+                           metadata={"tool": "calculator", "failed": True})
+                running_context += f"Step {i+1} FAILED: model returned no usable expression ({raw_expr!r}).\n"
+                continue
+
             try:
-                result = calculator(raw_expr.strip())
+                result = calculator(cleaned_expr)
                 n_tool_calls += 1
-                tracer.log("tool_call", inputs={"expression": raw_expr.strip()},
+                tracer.log("tool_call", inputs={"expression": cleaned_expr},
                            outputs={"result": result}, metadata={"tool": "calculator"})
                 last_result = result
                 running_context += f"Step {i+1} result: {result}\n"
             except CalculatorError as e:
-                tracer.log("tool_call", inputs={"expression": raw_expr.strip()},
+                tracer.log("tool_call", inputs={"expression": cleaned_expr},
                            outputs={"error": str(e)}, metadata={"tool": "calculator", "failed": True})
                 running_context += f"Step {i+1} FAILED to compute: {e}\n"
 
         return last_result, plan_steps, None, n_llm_calls, n_tool_calls, tokens_in_total, tokens_out_total
+
+    @staticmethod
+    def _extract_expression(text: str):
+        import re
+        candidates = re.findall(r"[\d\.\s\+\-\*/\(\)]{3,}", text)
+        for c in candidates:
+            if re.search(r"\d", c) and re.search(r"[\+\-\*/]", c):
+                return c.strip()
+        bare_number = re.search(r"-?\d+\.?\d*", text)
+        return bare_number.group(0) if bare_number else None
