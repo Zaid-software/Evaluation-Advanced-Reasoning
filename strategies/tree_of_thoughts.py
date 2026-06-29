@@ -181,8 +181,9 @@ class TreeOfThoughtsStrategy(Strategy):
                     tokens_in_total += t_in2
                     tokens_out_total += t_out2
                     try:
-                        value = max(0.0, min(1.0, float(raw_value.strip())))
-                    except ValueError:
+                        value = max(0.0, min(1.0, float(raw_value.strip()))) if raw_value else 0.5
+                    except (ValueError, AttributeError):
+
                         value = 0.5
 
                     tracer.log("branch", inputs={"parent_node_id": parent.node_id, "depth": depth, "branch_index": b},
@@ -215,6 +216,8 @@ class TreeOfThoughtsStrategy(Strategy):
 
     @staticmethod
     def _extract_expression(text: str):
+        if not text:
+            return None
         import re
         m = re.search(r"EXPRESSION:\s*(.+)", text)
         return m.group(1).strip() if m else None
